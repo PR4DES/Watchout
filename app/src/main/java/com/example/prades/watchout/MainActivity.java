@@ -1,5 +1,6 @@
 package com.example.prades.watchout;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -8,9 +9,7 @@ import android.widget.TextView;
 
 
 public class MainActivity extends AppCompatActivity {
-    TextView text;
     Button button;
-    int count = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -18,40 +17,22 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         getSupportActionBar().hide();
 
-        text = (TextView)findViewById(R.id.text);
         button = (Button)findViewById(R.id.button);
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(button.getText().toString() == "START") {
-                    button.setText("END");
+                if(button.getText().toString() == "END") {
+                    button.setText("START");
+                    Intent intent = new Intent(MainActivity.this,MainService.class); // 이동할 컴포넌트
+                    stopService(intent); // 서비스 종료
                 }
                 else {
-                    button.setText("START");
+                    button.setText("END");
+                    Intent intent = new Intent(MainActivity.this,MainService.class);
+                    startService(intent);
                 }
             }
         });
-
-        Thread t = new Thread() {
-            @Override
-            public void run() {
-                try {
-                    while (!isInterrupted()) {
-                        Thread.sleep(1000);
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                count = count+1;
-                                text.setText(String.valueOf(count));
-                            }
-                        });
-                    }
-                } catch (InterruptedException e) {
-                }
-            }
-        };
-
-        t.start();
     }
 }
