@@ -20,6 +20,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
+import android.os.Environment;
 import android.os.IBinder;
 import android.os.StrictMode;
 import android.provider.Settings;
@@ -29,8 +30,14 @@ import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.Buffer;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Calendar;
 
 /**
  * Created by prades on 2017-06-08.
@@ -38,20 +45,19 @@ import java.util.Arrays;
 
 public class MainService extends Service {
     private static final String TAG = "MainService";
-    protected static int camchoice;
 
     int count = 0;
     private boolean isRunning  = false;
+    int mWidth = 1280;
+    int mHeight = 720;
+    int mYSize = mWidth*mHeight;
+    int mUVSize = mYSize/4;
+    int mFrameSize = mYSize+(mUVSize*2);
 
     private String cId = "";
     protected CameraDevice cameraDevice;
     protected CameraCaptureSession session;
     protected ImageReader imageReader;
-    private static final int REQUEST_CODE_CAMERA = 999;
-
-    @TargetApi(Build.VERSION_CODES.M)
-    private void processImage(Image image){
-    }
 
     @TargetApi(Build.VERSION_CODES.M)
     class scb extends CameraDevice.StateCallback {
@@ -100,26 +106,40 @@ public class MainService extends Service {
         @Override
         public void onImageAvailable(ImageReader reader) {
             Image img = reader.acquireLatestImage();
-            Bitmap bitmap = null;
             if (img != null) {
-                Image.Plane[] p = img.getPlanes();
-                if (p[0].getBuffer() == null) {
-                    return;
+                long time= System.currentTimeMillis();
+                if(time%2000 < 100) {
+                    Image.Plane Y = img.getPlanes()[0];
+                    Image.Plane U = img.getPlanes()[1];
+                    Image.Plane V = img.getPlanes()[2];
+                    int yRowStride = Y.getRowStride();
+                    int yPixelStride = Y.getPixelStride();
+                    int uRowStride = U.getRowStride();
+                    int uPixelStride = U.getPixelStride();
+                    int vRowStride = V.getRowStride();
+                    int vPixelStride = V.getPixelStride();
+
+                    ByteBuffer YBuffer = Y.getBuffer();
+                    ByteBuffer UBuffer = U.getBuffer();
+                    ByteBuffer VBuffer = V.getBuffer();
+                    YBuffer.rewind();
+                    UBuffer.rewind();
+                    VBuffer.rewind();
+
+                    byte[] ybb;
+                    byte[] ubb;
+                    byte[] vbb;
+                    ybb = new byte[YBuffer.capacity()];
+                    ubb = new byte[UBuffer.capacity()];
+                    vbb = new byte[VBuffer.capacity()];
+
+                    YBuffer.get(ybb);
+                    UBuffer.get(ubb);
+                    VBuffer.get(vbb);
+                    Log.d("YBBBB", String.valueOf(YBuffer.capacity()));
+                    Log.d("UBBBB", String.valueOf(UBuffer.capacity()));
+                    Log.d("VBBBB", String.valueOf(VBuffer.capacity()));
                 }
-                int width = img.getWidth();
-                int height = img.getHeight();
-                int pixelStride = p[0].getPixelStride();
-                int rowStride = p[0].getRowStride();
-                int rowPadding = rowStride - pixelStride * width;
-                byte[] newData = new byte[width * height * 4];
-
-                int offset = 0;
-                Buffer buffer = p[0].getBuffer();
-                buffer.rewind();
-                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                //bitmap.copyPixelsFromBuffer(buffer);
-
-                processImage(img);
                 img.close();
             }
         }
@@ -142,7 +162,7 @@ public class MainService extends Service {
                 manager.openCamera(pickedCamera, cameraStateCallback, null);
 
                 Toast.makeText(getApplicationContext(), "service now start", Toast.LENGTH_SHORT).show();
-                imageReader = ImageReader.newInstance(1920, 1088, ImageFormat.JPEG, 2 /* images buffered */);
+                imageReader = ImageReader.newInstance(mWidth, mHeight, ImageFormat.YUV_420_888, 2);
                 imageReader.setOnImageAvailableListener(onImageAvailableListener, null);
             }
         } catch (CameraAccessException e){
@@ -156,7 +176,7 @@ public class MainService extends Service {
             for (String cameraId : manager.getCameraIdList()) {
                 CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
                 int cOrientation = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (cOrientation != camchoice) {
+                if (cOrientation == CameraCharacteristics.LENS_FACING_BACK) {
                     return cameraId;
                 }
             }
@@ -199,7 +219,6 @@ public class MainService extends Service {
     public void onCreate() {
         super.onCreate();
         isRunning = true;
-        camchoice = CameraCharacteristics.LENS_FACING_BACK;
     }
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
