@@ -9,6 +9,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
+import android.graphics.PixelFormat;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -21,6 +22,7 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.StrictMode;
 import android.provider.Settings;
@@ -28,16 +30,18 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.SurfaceView;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Calendar;
 
 /**
  * Created by prades on 2017-06-08.
@@ -46,18 +50,19 @@ import java.util.Calendar;
 public class MainService extends Service {
     private static final String TAG = "MainService";
 
-    int count = 0;
-    private boolean isRunning  = false;
     int mWidth = 1280;
     int mHeight = 720;
     int mYSize = mWidth*mHeight;
     int mUVSize = mYSize/4;
     int mFrameSize = mYSize+(mUVSize*2);
 
-    private String cId = "";
     protected CameraDevice cameraDevice;
     protected CameraCaptureSession session;
     protected ImageReader imageReader;
+
+    private int[] Ywindows = new int[10];
+    private int[] Uwindows = new int[10];
+    private int[] Vwindows = new int[10];
 
     @TargetApi(Build.VERSION_CODES.M)
     class scb extends CameraDevice.StateCallback {
@@ -101,6 +106,19 @@ public class MainService extends Service {
         }
     };
 
+    private void insertYWindow(int insert) {
+        for(int i=0; i<9; i++) Ywindows[i+1] = Ywindows[i];
+        Ywindows[0] = insert;
+    }
+    private void insertUWindow(int insert) {
+        for(int i=0; i<9; i++) Uwindows[i+1] = Uwindows[i];
+        Uwindows[0] = insert;
+    }
+    private void insertVWindow(int insert) {
+        for(int i=0; i<9; i++) Vwindows[i+1] = Vwindows[i];
+        Vwindows[0] = insert;
+    }
+
     @TargetApi(Build.VERSION_CODES.M)
      class ial implements ImageReader.OnImageAvailableListener {
         @Override
@@ -112,12 +130,6 @@ public class MainService extends Service {
                     Image.Plane Y = img.getPlanes()[0];
                     Image.Plane U = img.getPlanes()[1];
                     Image.Plane V = img.getPlanes()[2];
-                    int yRowStride = Y.getRowStride();
-                    int yPixelStride = Y.getPixelStride();
-                    int uRowStride = U.getRowStride();
-                    int uPixelStride = U.getPixelStride();
-                    int vRowStride = V.getRowStride();
-                    int vPixelStride = V.getPixelStride();
 
                     ByteBuffer YBuffer = Y.getBuffer();
                     ByteBuffer UBuffer = U.getBuffer();
@@ -126,19 +138,51 @@ public class MainService extends Service {
                     UBuffer.rewind();
                     VBuffer.rewind();
 
-                    byte[] ybb;
-                    byte[] ubb;
-                    byte[] vbb;
-                    ybb = new byte[YBuffer.capacity()];
-                    ubb = new byte[UBuffer.capacity()];
-                    vbb = new byte[VBuffer.capacity()];
+                    byte[] ybb = new byte[YBuffer.capacity()];
+                    byte[] ubb = new byte[UBuffer.capacity()];
+                    byte[] vbb = new byte[VBuffer.capacity()];
 
                     YBuffer.get(ybb);
                     UBuffer.get(ubb);
                     VBuffer.get(vbb);
-                    Log.d("YBBBB", String.valueOf(YBuffer.capacity()));
-                    Log.d("UBBBB", String.valueOf(UBuffer.capacity()));
-                    Log.d("VBBBB", String.valueOf(VBuffer.capacity()));
+
+                    int Yavgcolor = 0;
+                    int Uavgcolor = 0;
+                    int Vavgcolor = 0;
+                    for(int i=0; i<100; i++) {
+                        for(int j=0; j<100; j++) {
+                            Yavgcolor += Integer.parseInt(String.valueOf(ybb[mWidth*(1/2 + j) + i]));
+                        }
+                    }
+                    Yavgcolor = Yavgcolor/10000;
+                    insertYWindow(Yavgcolor);
+                    for(int i=0; i<100; i++) {
+                        for(int j=0; j<100; j++) {
+                            Uavgcolor += Integer.parseInt(String.valueOf(ubb[mWidth*(1/2 + j) + i]));
+                        }
+                    }
+                    Uavgcolor = Uavgcolor/10000;
+                    insertUWindow(Uavgcolor);
+                    for(int i=0; i<100; i++) {
+                        for(int j=0; j<100; j++) {
+                            Vavgcolor += Integer.parseInt(String.valueOf(vbb[mWidth*(1/2 + j) + i]));
+                        }
+                    }
+                    Vavgcolor = Vavgcolor/10000;
+                    insertVWindow(Vavgcolor);
+
+                    if(Math.abs(Ywindows[0]-Ywindows[1]) > 50 && Math.abs(Ywindows[0]-Ywindows[2]) > 50) {
+                        Toast.makeText(getApplicationContext(), "different Y?", Toast.LENGTH_SHORT).show();
+                    } else if (Math.abs(Uwindows[0]-Uwindows[1]) > 50 && Math.abs(Uwindows[0]-Uwindows[2]) > 50) {
+                        Toast.makeText(getApplicationContext(), "different U?", Toast.LENGTH_SHORT).show();
+                    } else if (Math.abs(Vwindows[0]-Vwindows[1]) > 50 && Math.abs(Vwindows[0]-Vwindows[2]) > 50) {
+                        Toast.makeText(getApplicationContext(), "different V?", Toast.LENGTH_SHORT).show();
+                    }
+
+                    Log.d("YBBBB", String.valueOf(Yavgcolor));
+                    Log.d("UBBBB", String.valueOf(Uavgcolor));
+                    Log.d("VBBBB", String.valueOf(Vavgcolor));
+                    Log.d("ABBBB"," ");
                 }
                 img.close();
             }
@@ -214,23 +258,25 @@ public class MainService extends Service {
         return null;
     }
 
-    @TargetApi(Build.VERSION_CODES.M)
     @Override
     public void onCreate() {
         super.onCreate();
-        isRunning = true;
-    }
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d("Start", "onStartCommand");
-        readyCamera();
-        return super.onStartCommand(intent, flags, startId);
     }
 
     @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d("Start", "onStartCommand");
+        for(int i=0; i<10; i++) Ywindows[i] = 0;
+        for(int i=0; i<10; i++) Uwindows[i] = 0;
+        for(int i=0; i<10; i++) Vwindows[i] = 0;
+        readyCamera();
+        return super.onStartCommand(intent, flags, startId);
+    }
+    @TargetApi(Build.VERSION_CODES.M)
+    @Override
     public void onDestroy() {
         super.onDestroy();
-        isRunning = false;
+        cameraDevice.close();
         Toast.makeText(getApplicationContext(), "service now destroyed", Toast.LENGTH_SHORT).show();
         Log.d("Destroy", "onDestroy");
     }

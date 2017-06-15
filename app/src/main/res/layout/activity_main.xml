@@ -11,17 +11,4 @@
         android:layout_height="wrap_content"
         android:text="START"/>
 
-    <TextureView
-        android:id="@+id/texture"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"/>
-
-    <ImageButton
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/imgClose"
-        android:layout_gravity="right|top"
-        android:padding="20dp"/>
-
 </LinearLayout>
