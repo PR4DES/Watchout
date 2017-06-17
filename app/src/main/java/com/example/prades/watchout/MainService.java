@@ -2,6 +2,7 @@ package com.example.prades.watchout;
 
 import android.Manifest;
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -16,6 +17,7 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
@@ -23,6 +25,7 @@ import android.media.ImageReader;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.StrictMode;
 import android.provider.Settings;
@@ -30,14 +33,13 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
-import android.view.Gravity;
+import android.util.Size;
 import android.view.LayoutInflater;
-import android.view.SurfaceView;
-import android.view.View;
-import android.view.ViewGroup;
+import android.view.Surface;
+import android.view.TextureView;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import java.nio.ByteBuffer;
@@ -106,17 +108,21 @@ public class MainService extends Service {
         }
     };
 
-    private void insertYWindow(int insert) {
-        for(int i=0; i<9; i++) Ywindows[i+1] = Ywindows[i];
-        Ywindows[0] = insert;
-    }
-    private void insertUWindow(int insert) {
-        for(int i=0; i<9; i++) Uwindows[i+1] = Uwindows[i];
-        Uwindows[0] = insert;
-    }
-    private void insertVWindow(int insert) {
-        for(int i=0; i<9; i++) Vwindows[i+1] = Vwindows[i];
-        Vwindows[0] = insert;
+    private void insertWindow(int insert, String area) {
+        switch (area) {
+            case "Y":
+                for(int i=0; i<9; i++) Ywindows[i+1] = Ywindows[i];
+                Ywindows[0] = insert;
+                break;
+            case "U":
+                for(int i=0; i<9; i++) Uwindows[i+1] = Uwindows[i];
+                Uwindows[0] = insert;
+                break;
+            case "V":
+                for(int i=0; i<9; i++) Vwindows[i+1] = Vwindows[i];
+                Vwindows[0] = insert;
+                break;
+        }
     }
 
     @TargetApi(Build.VERSION_CODES.M)
@@ -155,21 +161,21 @@ public class MainService extends Service {
                         }
                     }
                     Yavgcolor = Yavgcolor/10000;
-                    insertYWindow(Yavgcolor);
+                    insertWindow(Yavgcolor, "Y");
                     for(int i=0; i<100; i++) {
                         for(int j=0; j<100; j++) {
                             Uavgcolor += Integer.parseInt(String.valueOf(ubb[mWidth*(1/2 + j) + i]));
                         }
                     }
                     Uavgcolor = Uavgcolor/10000;
-                    insertUWindow(Uavgcolor);
+                    insertWindow(Uavgcolor,"U");
                     for(int i=0; i<100; i++) {
                         for(int j=0; j<100; j++) {
                             Vavgcolor += Integer.parseInt(String.valueOf(vbb[mWidth*(1/2 + j) + i]));
                         }
                     }
                     Vavgcolor = Vavgcolor/10000;
-                    insertVWindow(Vavgcolor);
+                    insertWindow(Vavgcolor,"V");
 
                     if(Math.abs(Ywindows[0]-Ywindows[1]) > 50 && Math.abs(Ywindows[0]-Ywindows[2]) > 50) {
                         Toast.makeText(getApplicationContext(), "different Y?", Toast.LENGTH_SHORT).show();
@@ -198,6 +204,7 @@ public class MainService extends Service {
         CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         try {
             String pickedCamera = getCamera(manager);
+
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(getApplicationContext(), "ready permission denied", Toast.LENGTH_SHORT).show();
                 return;
@@ -252,7 +259,6 @@ public class MainService extends Service {
         }
     }
 
-
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -269,9 +275,11 @@ public class MainService extends Service {
         for(int i=0; i<10; i++) Ywindows[i] = 0;
         for(int i=0; i<10; i++) Uwindows[i] = 0;
         for(int i=0; i<10; i++) Vwindows[i] = 0;
+
         readyCamera();
         return super.onStartCommand(intent, flags, startId);
     }
+
     @TargetApi(Build.VERSION_CODES.M)
     @Override
     public void onDestroy() {

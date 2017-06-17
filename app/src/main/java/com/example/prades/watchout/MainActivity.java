@@ -9,14 +9,18 @@ import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
 
 
 public class MainActivity extends AppCompatActivity {
     Button button;
+
+    private TextureView mCameraTextureView;
+    private Preview mPreview;
+
     private static final int REQUEST_CAMERA_RESULT = 1;
 
     @Override
@@ -32,6 +36,10 @@ public class MainActivity extends AppCompatActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_RESULT);
         }
+
+        mCameraTextureView = (TextureView) findViewById(R.id.cameraTextureView);
+        mPreview = new Preview(this, mCameraTextureView);
+        mPreview.openCamera();
 
         button = (Button)findViewById(R.id.button);
         if(isMyServiceRunning(MainService.class)) {
@@ -76,5 +84,17 @@ public class MainActivity extends AppCompatActivity {
                 super.onRequestPermissionsResult(requestCode, permissions, grantResults);
                 break;
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mPreview.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mPreview.onPause();
     }
 }
