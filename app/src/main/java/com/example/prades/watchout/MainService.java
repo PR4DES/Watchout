@@ -62,9 +62,25 @@ public class MainService extends Service {
     protected CameraCaptureSession session;
     protected ImageReader imageReader;
 
-    private int[] Ywindows = new int[10];
-    private int[] Uwindows = new int[10];
-    private int[] Vwindows = new int[10];
+    int distance = 0;
+    int count = 0;
+    boolean detection = false;
+    int prevY = 0;
+    int prevU = 0;
+    int prevV = 0;
+
+    class YUV {
+        int Y;
+        int U;
+        int V;
+        YUV() {
+            Y=0; U=0; V=0;
+        }
+        YUV(int y, int u, int v) {
+            Y=y; U=u; V=v;
+        }
+    }
+    private YUV[] windows = new YUV[mHeight/10];
 
     @TargetApi(Build.VERSION_CODES.M)
     class scb extends CameraDevice.StateCallback {
@@ -108,21 +124,69 @@ public class MainService extends Service {
         }
     };
 
-    private void insertWindow(int insert, String area) {
-        switch (area) {
-            case "Y":
-                for(int i=0; i<9; i++) Ywindows[i+1] = Ywindows[i];
-                Ywindows[0] = insert;
-                break;
-            case "U":
-                for(int i=0; i<9; i++) Uwindows[i+1] = Uwindows[i];
-                Uwindows[0] = insert;
-                break;
-            case "V":
-                for(int i=0; i<9; i++) Vwindows[i+1] = Vwindows[i];
-                Vwindows[0] = insert;
-                break;
+    private void insertWindow(int y, int u, int v) {
+        for(int i=0; i<9; i++) windows[i+1] = windows[i];
+        windows[0].Y = y;
+        windows[0].U = u;
+        windows[0].V = v;
+    }
+
+    @TargetApi(Build.VERSION_CODES.M)
+    private void imageprocess(Image image) {
+        Image.Plane Y = image.getPlanes()[0];
+        Image.Plane U = image.getPlanes()[1];
+        Image.Plane V = image.getPlanes()[2];
+
+        ByteBuffer YBuffer = Y.getBuffer();
+        ByteBuffer UBuffer = U.getBuffer();
+        ByteBuffer VBuffer = V.getBuffer();
+        YBuffer.rewind();
+        UBuffer.rewind();
+        VBuffer.rewind();
+
+        byte[] ybb = new byte[YBuffer.capacity()];
+        byte[] ubb = new byte[UBuffer.capacity()];
+        byte[] vbb = new byte[VBuffer.capacity()];
+
+        YBuffer.get(ybb);
+        UBuffer.get(ubb);
+        VBuffer.get(vbb);
+
+        int threshold = 50;
+        int cnt = 0;
+        int prevdist = 0;
+        for(int i=0; i<mHeight/10; i=i+10) {
+            int Ysum = 0; int Usum = 0; int Vsum = 0;
+            for(int j=0; j<10; j++) {
+                Ysum += ybb[i+j] + ybb[i+j+mHeight] + ybb[i+j+2*mHeight];
+                Usum += ubb[i+j] + ubb[i+j+mHeight] + ubb[i+j+2*mHeight];
+                Vsum += vbb[i+j] + vbb[i+j+mHeight] + vbb[i+j+2*mHeight];
+            }
+            Ysum = Ysum/30;
+            Usum = Usum/30;
+            Vsum = Vsum/30;
+            if(prevY == 0) {
+                prevY = Ysum; prevU = Usum; prevV = Vsum;
+            } else {
+                if(Math.abs(prevY - Ysum) > threshold || Math.abs(prevU-Usum) > threshold || Math.abs(prevV-Vsum) > threshold) {
+                    if(Math.abs((i-prevdist)/cnt - distance/count) < 100) {
+                        if(detection)
+                            Toast.makeText(getApplicationContext(), "Something is in front of you!", Toast.LENGTH_SHORT).show();
+                        } else {
+                        detection = true;
+                    }
+                    distance += (i-prevdist)/cnt;
+                    count ++;
+                    cnt = 0;
+                    prevdist = i;
+                }
+                prevY = Ysum; prevU = Usum; prevV = Vsum;
+                cnt++;
+            }
         }
+        distance = distance/count;
+
+        Log.d("ABBBB"," ");
     }
 
     @TargetApi(Build.VERSION_CODES.M)
@@ -133,62 +197,7 @@ public class MainService extends Service {
             if (img != null) {
                 long time= System.currentTimeMillis();
                 if(time%2000 < 100) {
-                    Image.Plane Y = img.getPlanes()[0];
-                    Image.Plane U = img.getPlanes()[1];
-                    Image.Plane V = img.getPlanes()[2];
-
-                    ByteBuffer YBuffer = Y.getBuffer();
-                    ByteBuffer UBuffer = U.getBuffer();
-                    ByteBuffer VBuffer = V.getBuffer();
-                    YBuffer.rewind();
-                    UBuffer.rewind();
-                    VBuffer.rewind();
-
-                    byte[] ybb = new byte[YBuffer.capacity()];
-                    byte[] ubb = new byte[UBuffer.capacity()];
-                    byte[] vbb = new byte[VBuffer.capacity()];
-
-                    YBuffer.get(ybb);
-                    UBuffer.get(ubb);
-                    VBuffer.get(vbb);
-
-                    int Yavgcolor = 0;
-                    int Uavgcolor = 0;
-                    int Vavgcolor = 0;
-                    for(int i=0; i<100; i++) {
-                        for(int j=0; j<100; j++) {
-                            Yavgcolor += Integer.parseInt(String.valueOf(ybb[mWidth*(1/2 + j) + i]));
-                        }
-                    }
-                    Yavgcolor = Yavgcolor/10000;
-                    insertWindow(Yavgcolor, "Y");
-                    for(int i=0; i<100; i++) {
-                        for(int j=0; j<100; j++) {
-                            Uavgcolor += Integer.parseInt(String.valueOf(ubb[mWidth*(1/2 + j) + i]));
-                        }
-                    }
-                    Uavgcolor = Uavgcolor/10000;
-                    insertWindow(Uavgcolor,"U");
-                    for(int i=0; i<200; i++) {
-                        for(int j=0; j<100; j++) {
-                            Vavgcolor += Integer.parseInt(String.valueOf(vbb[mWidth*(1/2 + j) + i]));
-                        }
-                    }
-                    Vavgcolor = Vavgcolor/20000;
-                    insertWindow(Vavgcolor,"V");
-
-                    if(Math.abs(Ywindows[0]-Ywindows[1]) > 50 && Math.abs(Ywindows[0]-Ywindows[2]) > 50) {
-                        Toast.makeText(getApplicationContext(), "different Y?", Toast.LENGTH_SHORT).show();
-                    } else if (Math.abs(Uwindows[0]-Uwindows[1]) > 50 && Math.abs(Uwindows[0]-Uwindows[2]) > 50) {
-                        Toast.makeText(getApplicationContext(), "different U?", Toast.LENGTH_SHORT).show();
-                    } else if (Math.abs(Vwindows[0]-Vwindows[1]) > 50 && Math.abs(Vwindows[0]-Vwindows[2]) > 50) {
-                        Toast.makeText(getApplicationContext(), "different V?", Toast.LENGTH_SHORT).show();
-                    }
-
-                    Log.d("YBBBB", String.valueOf(Yavgcolor));
-                    Log.d("UBBBB", String.valueOf(Uavgcolor));
-                    Log.d("VBBBB", String.valueOf(Vavgcolor));
-                    Log.d("ABBBB"," ");
+                   imageprocess(img);
                 }
                 img.close();
             }
@@ -272,9 +281,6 @@ public class MainService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d("Start", "onStartCommand");
-        for(int i=0; i<10; i++) Ywindows[i] = 0;
-        for(int i=0; i<10; i++) Uwindows[i] = 0;
-        for(int i=0; i<10; i++) Vwindows[i] = 0;
 
         readyCamera();
         return super.onStartCommand(intent, flags, startId);

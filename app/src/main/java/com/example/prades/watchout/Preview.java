@@ -69,6 +69,8 @@ public class Preview extends Thread {
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             mPreviewSize = map.getOutputSizes(SurfaceTexture.class)[0];
 
+            Log.d("MPREVIEWWSIZE", "mpreviewsize"+String.valueOf(mPreviewSize.getHeight()) + " " + String.valueOf(mPreviewSize.getWidth()));
+
             int permissionCamera = ContextCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA);
             if(permissionCamera == PackageManager.PERMISSION_DENIED) {
                 Toast.makeText((Activity) mContext, "ready permission denied", Toast.LENGTH_SHORT).show();
