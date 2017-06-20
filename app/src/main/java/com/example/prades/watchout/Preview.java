@@ -203,7 +203,6 @@ public class Preview extends Thread {
         Log.d(TAG, "onPause");
         if (null != mCameraDevice) {
             mCameraDevice.close();
-            mCameraDevice = null;
             Log.d(TAG, "CameraDevice Close");
         }
     }

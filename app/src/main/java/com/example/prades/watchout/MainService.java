@@ -169,12 +169,12 @@ public class MainService extends Service {
                     }
                     Uavgcolor = Uavgcolor/10000;
                     insertWindow(Uavgcolor,"U");
-                    for(int i=0; i<100; i++) {
+                    for(int i=0; i<200; i++) {
                         for(int j=0; j<100; j++) {
                             Vavgcolor += Integer.parseInt(String.valueOf(vbb[mWidth*(1/2 + j) + i]));
                         }
                     }
-                    Vavgcolor = Vavgcolor/10000;
+                    Vavgcolor = Vavgcolor/20000;
                     insertWindow(Vavgcolor,"V");
 
                     if(Math.abs(Ywindows[0]-Ywindows[1]) > 50 && Math.abs(Ywindows[0]-Ywindows[2]) > 50) {

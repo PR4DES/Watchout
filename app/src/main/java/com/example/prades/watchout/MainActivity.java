@@ -52,9 +52,11 @@ public class MainActivity extends AppCompatActivity {
                 if(button.getText().toString() == "END") {
                     Intent intent = new Intent(MainActivity.this,MainService.class);
                     stopService(intent);
+                    mPreview.openCamera();
                     button.setText("START");
                 }
                 else {
+                    mPreview.onPause();
                     Intent intent = new Intent(MainActivity.this,MainService.class);
                     startService(intent);
                     button.setText("END");
